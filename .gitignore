@@ -1,0 +1,13 @@
+.*/
+!.github/
+*.json
+*.exe
+*.old
+*.txt
+*.log
+*.bak
+*.bat
+*.env
+*.dat
+*.db
+test*/
