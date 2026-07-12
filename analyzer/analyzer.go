@@ -4,18 +4,12 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"slices"
 	"strconv"
-	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
 )
-
-var logPackages = []string{"log/slog", "go.uber.org/zap"}
-var logFunctionNames = []string{"Log", "Debug", "Info", "Warn", "Error", "Fatal"}
-var sensitiveData = []string{"password", "key", "token"}
 
 var Analyzer = analysis.Analyzer{
 	Name:     "logs_lint",
@@ -39,28 +33,13 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 
 		method := sel.Sel.Name
-
 		if !isLogFunction(method) {
 			return
 		}
 
-		var pkg *ast.Ident
-		for {
-			pkg, ok = sel.X.(*ast.Ident)
-			if ok {
-				break
-			}
-
-			var call *ast.CallExpr
-			call, ok = sel.X.(*ast.CallExpr)
-			if !ok {
-				return
-			}
-
-			sel, ok = call.Fun.(*ast.SelectorExpr)
-			if !ok {
-				return
-			}
+		pkg := unwrapPkg(sel)
+		if pkg == nil {
+			return
 		}
 
 		obj := pass.TypesInfo.ObjectOf(pkg)
@@ -68,8 +47,8 @@ func run(pass *analysis.Pass) (any, error) {
 		if !ok {
 			return
 		}
-		packagePath := pkgName.Imported().Path()
 
+		packagePath := pkgName.Imported().Path()
 		if !isLogPackage(packagePath) {
 			return
 		}
@@ -80,8 +59,9 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 
 		arg := args[0]
+
 		if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-			checkLogMessage(pass, lit)
+			checkStringLog(pass, lit)
 		} else if ident, ok := arg.(*ast.Ident); ok {
 			if isSensitiveVar(ident.Name) {
 				pass.Report(analysis.Diagnostic{
@@ -91,52 +71,32 @@ func run(pass *analysis.Pass) (any, error) {
 				})
 			}
 		}
-
 	})
 
 	return nil, nil
 }
 
-func isLogPackage(packagePath string) bool {
-	return slices.Contains(logPackages, packagePath)
-}
+func unwrapPkg(sel *ast.SelectorExpr) *ast.Ident {
+	for {
+		pkg, ok := sel.X.(*ast.Ident)
+		if ok {
+			return pkg
+		}
 
-func isLogFunction(method string) bool {
-	return slices.Contains(logFunctionNames, method)
-}
+		var call *ast.CallExpr
+		call, ok = sel.X.(*ast.CallExpr)
+		if !ok {
+			return nil
+		}
 
-func startsWithLowercase(message string) bool {
-	return len(message) > 0 && 'a' <= message[0] && message[0] <= 'z'
-}
-
-func areCharactersAllowed(message string) bool {
-	for _, c := range message {
-		isEnglishLetter := 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
-		isNumber := '0' <= c && c <= '9'
-		isSpace := c == ' '
-
-		if !(isEnglishLetter || isNumber || isSpace) {
-			return false
+		sel, ok = call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return nil
 		}
 	}
-
-	return true
 }
 
-func hasSensitiveData(message string) bool {
-	for _, data := range sensitiveData {
-		if strings.Contains(message, data) {
-			return true
-		}
-	}
-	return false
-}
-
-func isSensitiveVar(name string) bool {
-	return slices.Contains(sensitiveData, name)
-}
-
-func checkLogMessage(pass *analysis.Pass, lit *ast.BasicLit) {
+func checkStringLog(pass *analysis.Pass, lit *ast.BasicLit) {
 	message, err := strconv.Unquote(lit.Value)
 	if err != nil {
 		return
