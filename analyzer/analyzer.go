@@ -128,13 +128,6 @@ func checkStringLog(pass *analysis.Pass, lit *ast.BasicLit, isFirst bool) {
 			Message:  "message contains prohibited characters",
 		})
 	}
-	if hasSensitiveData(message) {
-		pass.Report(analysis.Diagnostic{
-			Pos:      lit.Pos(),
-			Category: "security",
-			Message:  "message contains sensitive data",
-		})
-	}
 }
 
 func checkVarLog(pass *analysis.Pass, ident *ast.Ident) {

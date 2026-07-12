@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"slices"
-	"strings"
 )
 
 var logPackages = []string{"log/slog", "go.uber.org/zap"}
@@ -33,15 +32,6 @@ func areCharactersAllowed(message string) bool {
 	}
 
 	return true
-}
-
-func hasSensitiveData(message string) bool {
-	for _, data := range sensitiveData {
-		if strings.Contains(message, data) {
-			return true
-		}
-	}
-	return false
 }
 
 func isSensitiveVar(name string) bool {
