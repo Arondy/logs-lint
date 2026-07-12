@@ -59,21 +59,22 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 
 		arg := args[0]
-
-		if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-			checkStringLog(pass, lit)
-		} else if ident, ok := arg.(*ast.Ident); ok {
-			if isSensitiveVar(ident.Name) {
-				pass.Report(analysis.Diagnostic{
-					Pos:      ident.Pos(),
-					Category: "security",
-					Message:  "message contains sensitive variable",
-				})
-			}
+		exprs := unwrapExpr(arg)
+		for i, expr := range exprs {
+			checkExpr(pass, expr, i == 0)
 		}
 	})
 
 	return nil, nil
+}
+
+func checkExpr(pass *analysis.Pass, expr ast.Expr, isFirst bool) {
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		checkStringLog(pass, v, isFirst)
+	case *ast.Ident:
+		checkVarLog(pass, v)
+	}
 }
 
 func unwrapPkg(sel *ast.SelectorExpr) *ast.Ident {
@@ -96,13 +97,24 @@ func unwrapPkg(sel *ast.SelectorExpr) *ast.Ident {
 	}
 }
 
-func checkStringLog(pass *analysis.Pass, lit *ast.BasicLit) {
+func unwrapExpr(expr ast.Expr) []ast.Expr {
+	if lit, ok := expr.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+		return []ast.Expr{lit}
+	} else if bin, ok := expr.(*ast.BinaryExpr); ok && bin.Op == token.ADD {
+		return append(unwrapExpr(bin.X), unwrapExpr(bin.Y)...)
+	} else if ident, ok := expr.(*ast.Ident); ok {
+		return []ast.Expr{ident}
+	}
+	return nil
+}
+
+func checkStringLog(pass *analysis.Pass, lit *ast.BasicLit, isFirst bool) {
 	message, err := strconv.Unquote(lit.Value)
 	if err != nil {
 		return
 	}
 
-	if !startsWithLowercase(message) {
+	if isFirst && !startsWithLowercase(message) {
 		pass.Report(analysis.Diagnostic{
 			Pos:      lit.Pos(),
 			Category: "style",
@@ -121,6 +133,16 @@ func checkStringLog(pass *analysis.Pass, lit *ast.BasicLit) {
 			Pos:      lit.Pos(),
 			Category: "security",
 			Message:  "message contains sensitive data",
+		})
+	}
+}
+
+func checkVarLog(pass *analysis.Pass, ident *ast.Ident) {
+	if isSensitiveVar(ident.Name) {
+		pass.Report(analysis.Diagnostic{
+			Pos:      ident.Pos(),
+			Category: "security",
+			Message:  "message contains sensitive variable",
 		})
 	}
 }
