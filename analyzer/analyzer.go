@@ -79,6 +79,14 @@ func run(pass *analysis.Pass) (any, error) {
 		for _, arg := range args {
 			if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 				checkLogMessage(pass, lit)
+			} else if ident, ok := arg.(*ast.Ident); ok {
+				if isSensitiveVar(ident.Name) {
+					pass.Report(analysis.Diagnostic{
+						Pos:      ident.Pos(),
+						Category: "security",
+						Message:  "message contains sensitive variable",
+					})
+				}
 			}
 		}
 	})
@@ -119,6 +127,10 @@ func hasSensitiveData(message string) bool {
 		}
 	}
 	return false
+}
+
+func isSensitiveVar(name string) bool {
+	return slices.Contains(sensitiveData, name)
 }
 
 func checkLogMessage(pass *analysis.Pass, lit *ast.BasicLit) {
