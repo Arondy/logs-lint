@@ -3,6 +3,7 @@ package analyzer
 import (
 	"go/ast"
 	"go/token"
+	"go/types"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-var checkedPackages = []string{"log", "slog", "zap"}
+var logPackages = []string{"log/slog", "go.uber.org/zap"}
 var logFunctionNames = []string{"Log", "Debug", "Info", "Warn", "Error", "Fatal"}
 var sensitiveData = []string{"password", "key", "token"}
 
@@ -62,9 +63,14 @@ func run(pass *analysis.Pass) (any, error) {
 			}
 		}
 
-		packageName := pkg.Name
+		obj := pass.TypesInfo.ObjectOf(pkg)
+		pkgName, ok := obj.(*types.PkgName)
+		if !ok {
+			return
+		}
+		packagePath := pkgName.Imported().Path()
 
-		if !isLogPackage(packageName) {
+		if !isLogPackage(packagePath) {
 			return
 		}
 
@@ -80,8 +86,8 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-func isLogPackage(packageName string) bool {
-	return slices.Contains(checkedPackages, packageName)
+func isLogPackage(packagePath string) bool {
+	return slices.Contains(logPackages, packagePath)
 }
 
 func isLogFunction(method string) bool {
