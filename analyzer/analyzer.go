@@ -37,15 +37,34 @@ func run(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		pkg, ok := sel.X.(*ast.Ident)
-		if !ok {
+		method := sel.Sel.Name
+
+		if !isLogFunction(method) {
 			return
 		}
 
-		packageName := pkg.Name
-		method := sel.Sel.Name
+		var pkg *ast.Ident
+		for {
+			pkg, ok = sel.X.(*ast.Ident)
+			if ok {
+				break
+			}
 
-		if !(isCheckedPackage(packageName) && isLogFunction(method)) {
+			var call *ast.CallExpr
+			call, ok = sel.X.(*ast.CallExpr)
+			if !ok {
+				return
+			}
+
+			sel, ok = call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return
+			}
+		}
+
+		packageName := pkg.Name
+
+		if !isLogPackage(packageName) {
 			return
 		}
 
@@ -61,7 +80,7 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-func isCheckedPackage(packageName string) bool {
+func isLogPackage(packageName string) bool {
 	return slices.Contains(checkedPackages, packageName)
 }
 
