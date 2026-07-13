@@ -1,0 +1,6 @@
+version: v2.12.2
+name: logs-gcl
+destination: ./build
+plugins:
+  - module: github.com/Arondy/logs-lint
+    path: .

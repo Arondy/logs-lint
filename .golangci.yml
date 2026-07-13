@@ -1,0 +1,12 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - logs-lint
+
+  settings:
+    custom:
+      logs-lint:
+        type: module
+        description: find logs with style/security issues
