@@ -12,5 +12,5 @@ func TestAnalyzer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	analysistest.Run(t, td, &Analyzer, "logs")
+	analysistest.Run(t, td, Analyzer, "logs")
 }

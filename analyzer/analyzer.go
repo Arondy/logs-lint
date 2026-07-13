@@ -11,7 +11,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-var Analyzer = analysis.Analyzer{
+var Analyzer = &analysis.Analyzer{
 	Name:     "logs_lint",
 	Doc:      "find logs with style/security issues",
 	Run:      run,
